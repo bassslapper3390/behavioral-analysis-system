@@ -1,24 +1,30 @@
 import { NextResponse } from "next/server"
-import { verifyAuth } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(request)
-    if (!authResult.success) {
-      return NextResponse.json({ message: authResult.error }, { status: 401 })
-    }
+    const result = await query(`
+      SELECT 
+        al.id,
+        al.user_id,
+        u.username,
+        al.action,
+        al.table_name,
+        al.record_id,
+        al.details,
+        al.timestamp
+      FROM audit_logs al
+      LEFT JOIN users u ON al.user_id = u.id
+      ORDER BY al.timestamp DESC
+      LIMIT 100
+    `)
 
-    // Get user ID from auth result
-    const userId = (authResult.user as any).id
-
-    // Fetch audit logs from database
-    const auditLogs = await query("SELECT * FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC", [userId])
-
-    return NextResponse.json(auditLogs)
+    return NextResponse.json(result)
   } catch (error) {
-    console.error("Error fetching audit logs:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    console.error('Error fetching audit logs:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch audit logs' },
+      { status: 500 }
+    )
   }
 }

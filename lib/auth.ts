@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken"
 import { query, getBehavioralProfile, logAnomaly } from "./db"
-import { type BehavioralProfile, detectAnomaly } from "./behavior-tracker"
+import { type BehavioralProfile, detectAnomalies } from "./behavior-tracker"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -74,21 +74,25 @@ export async function verifyBehavior(userId: number, currentProfile: BehavioralP
       return { success: true, isFirstLogin: true }
     }
 
+    // Cast to EnhancedBehavioralProfile for anomaly detection
+    const enhancedCurrent = currentProfile as any; // Should match EnhancedBehavioralProfile
+    const enhancedStored = storedProfile as any;
+
     // Detect anomaly
-    const anomalyResult = detectAnomaly(currentProfile, storedProfile)
+    const anomalyResult = detectAnomalies(enhancedCurrent, [enhancedStored])
 
     // Log the result
     await logAnomaly(
       userId,
       anomalyResult.isAnomaly,
-      anomalyResult.confidenceScore,
+      anomalyResult.confidence,
       anomalyResult.isAnomaly ? "Suspicious behavior detected" : "Normal behavior",
     )
 
     return {
       success: !anomalyResult.isAnomaly,
       isFirstLogin: false,
-      confidenceScore: anomalyResult.confidenceScore,
+      confidenceScore: anomalyResult.confidence,
     }
   } catch (error) {
     console.error("Error verifying behavior:", error)

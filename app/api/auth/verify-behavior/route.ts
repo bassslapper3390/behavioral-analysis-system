@@ -13,11 +13,10 @@ export async function POST(request: Request) {
 
     // Get user ID from auth result
     const userId = (authResult.user as any).id
-
     console.log("Verifying behavior for user:", userId)
 
-    // Get behavioral profile and context from request
-    const { behavioralProfile, context = "login" } = await request.json()
+    // Get behavioral profile from request
+    const { behavioralProfile } = await request.json()
 
     if (!behavioralProfile) {
       return NextResponse.json({ message: "Behavioral profile is required" }, { status: 400 })
@@ -42,18 +41,16 @@ export async function POST(request: Request) {
 
     console.log("Stored profile found for user:", userId, "Detecting anomalies")
 
-    // Detect anomaly with enhanced detection
+    // Detect anomaly
     const anomalyResult = detectAnomaly(behavioralProfile, storedProfile)
     console.log("Anomaly detection result:", anomalyResult)
 
-    // Log the result with detailed information
+    // Log the result
     await logAnomaly(
       userId,
       anomalyResult.isAnomaly,
       anomalyResult.confidenceScore,
-      anomalyResult.isAnomaly
-        ? `Suspicious behavior detected during ${context}: ${anomalyResult.anomalyDetails.join(", ")}`
-        : `Normal behavior during ${context}`,
+      anomalyResult.isAnomaly ? "Suspicious behavior detected during login" : "Normal behavior during login",
     )
 
     // Log audit
@@ -62,7 +59,7 @@ export async function POST(request: Request) {
       "VERIFY",
       "behavioral_profiles",
       userId.toString(),
-      `Behavior verification (${context}): ${anomalyResult.isAnomaly ? "Anomaly detected" : "Normal behavior"}`,
+      `Behavior verification: ${anomalyResult.isAnomaly ? "Anomaly detected" : "Normal behavior"}`,
     )
 
     // Update profile with new data (gradual learning)
@@ -75,7 +72,6 @@ export async function POST(request: Request) {
       message: anomalyResult.isAnomaly ? "Suspicious behavior detected" : "Behavior verified",
       isAnomaly: anomalyResult.isAnomaly,
       confidenceScore: anomalyResult.confidenceScore,
-      anomalyDetails: anomalyResult.anomalyDetails,
     })
   } catch (error) {
     console.error("Behavior verification error:", error)

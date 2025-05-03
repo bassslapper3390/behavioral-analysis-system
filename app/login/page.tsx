@@ -13,12 +13,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import CaptchaWithBehavior from "@/components/captcha-with-behavior"
 import type { BehavioralProfile } from "@/lib/behavior-tracker"
+import { behaviorMonitor } from '@/lib/monitoring'
 
 export default function Login() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered")
-  const redirectTo = searchParams.get("redirect") || "/banking"
 
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -26,7 +26,6 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const [showCaptcha, setShowCaptcha] = useState(false)
   const [userId, setUserId] = useState<number | null>(null)
-  const [token, setToken] = useState<string | null>(null)
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null)
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -35,39 +34,39 @@ export default function Login() {
     setError("")
 
     try {
-      // For demo purposes, allow login with demo/password
-      if (username === "demo" && password === "password") {
-        // Show CAPTCHA for behavior verification
-        setShowCaptcha(true)
-        setVerificationStatus("Please complete the CAPTCHA for behavior verification")
-        return
-      }
-
       // Call the backend API for login
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          username, 
+          password
+        }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Login failed")
+        throw new Error(data.error || "Login failed")
       }
 
-      // Store user ID and token for behavior verification
-      setUserId(data.user?.id || 1)
-      setToken(data.token || "demo-token")
+      // Store user ID and username for monitoring and session
+      setUserId(data.userId)
+      localStorage.setItem("userId", data.userId.toString())
+      localStorage.setItem("username", username)
 
       // Show CAPTCHA for behavior verification
       setShowCaptcha(true)
       setVerificationStatus("Please complete the CAPTCHA for behavior verification")
+
+      // Initialize behavior monitoring with correct userId
+      behaviorMonitor.setUserId(data.userId.toString())
     } catch (error: any) {
       console.error("Login error:", error)
       setError(error.message || "Invalid username or password")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -76,7 +75,7 @@ export default function Login() {
     success: boolean
     behavioralProfile?: BehavioralProfile
   }) => {
-    if (!result.success || !result.behavioralProfile) {
+    if (!result.success || !userId || !result.behavioralProfile) {
       setError("Behavior verification failed. Please try again.")
       setShowCaptcha(false)
       setIsLoading(false)
@@ -86,25 +85,16 @@ export default function Login() {
     setVerificationStatus("Verifying your behavioral pattern...")
 
     try {
-      // For demo purposes, we'll simulate the verification
-      // In a real app, you would call the API
-
-      // Store user data in localStorage
+      // Initialize behavior monitoring
+      behaviorMonitor.setUserId(userId.toString())
+      localStorage.setItem("userId", userId.toString())
       localStorage.setItem("username", username)
-      localStorage.setItem("token", token || "demo-token")
 
-      // Set a cookie for server-side auth
-      document.cookie = `token=${token || "demo-token"}; path=/; max-age=3600`
-
-      setVerificationStatus("Behavior verified successfully! Redirecting...")
-
-      // Redirect to banking dashboard after a short delay
-      setTimeout(() => {
-        router.push(redirectTo)
-      }, 1000)
+      // Redirect to hospital homepage
+      router.push("/hospital")
     } catch (error: any) {
       console.error("Behavior verification error:", error)
-      setError(error.message || "Verification failed")
+      setError(error.message)
       setShowCaptcha(false)
       setIsLoading(false)
     }

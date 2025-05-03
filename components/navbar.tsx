@@ -1,49 +1,54 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LogOut } from "lucide-react"
+import { Menu, X, LogOut, User } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function Navbar() {
   const pathname = usePathname()
-  const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [username, setUsername] = useState("")
 
   // Check if user is logged in on client side only
   useEffect(() => {
     const storedUsername = localStorage.getItem("username")
     setIsLoggedIn(!!storedUsername)
+    if (storedUsername) {
+      setUsername(storedUsername)
+    }
   }, [pathname])
 
   const handleLogout = () => {
     localStorage.removeItem("username")
     localStorage.removeItem("token")
-
-    // Clear the auth cookie
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-
     setIsLoggedIn(false)
-    router.push("/login")
+    window.location.href = "/login"
   }
+
+  // Set links based on auth state
+  const homeLink = isLoggedIn ? "/hospital-home" : "/login"
+  const dashboardLink = "/hospital"
+  const auditLogLink = "/logs"
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
-          <Link href="/" className="font-bold text-xl">
-            BehaviorSys
+          <Link href={homeLink} className="font-bold text-xl">
+            STRAND
           </Link>
         </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
           <Link
-            href="/"
+            href={homeLink}
             className={`text-sm font-medium transition-colors hover:text-primary ${
-              pathname === "/" ? "text-primary" : "text-muted-foreground"
+              pathname === homeLink ? "text-primary" : "text-muted-foreground"
             }`}
           >
             Home
@@ -52,28 +57,20 @@ export default function Navbar() {
           {isLoggedIn && (
             <>
               <Link
-                href="/dashboard"
+                href={dashboardLink}
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
+                  pathname === dashboardLink ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 Dashboard
               </Link>
               <Link
-                href="/audit"
+                href={auditLogLink}
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/audit" ? "text-primary" : "text-muted-foreground"
+                  pathname === auditLogLink ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 Audit Log
-              </Link>
-              <Link
-                href="/banking"
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/banking" ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                Banking
               </Link>
             </>
           )}
@@ -88,10 +85,20 @@ export default function Navbar() {
               </Button>
             </div>
           ) : (
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="gap-2">
+                  <User className="h-5 w-5" />
+                  <span className="sr-only md:not-sr-only md:ml-2">{username}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </nav>
 
@@ -108,32 +115,25 @@ export default function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden border-t">
           <div className="container py-4 space-y-4">
-            <Link href="/" className="flex items-center gap-2 text-sm font-medium" onClick={() => setIsMenuOpen(false)}>
+            <Link href={homeLink} className="flex items-center gap-2 text-sm font-medium" onClick={() => setIsMenuOpen(false)}>
               Home
             </Link>
 
             {isLoggedIn && (
               <>
                 <Link
-                  href="/dashboard"
+                  href={dashboardLink}
                   className="flex items-center gap-2 text-sm font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
                 <Link
-                  href="/audit"
+                  href={auditLogLink}
                   className="flex items-center gap-2 text-sm font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Audit Log
-                </Link>
-                <Link
-                  href="/banking"
-                  className="flex items-center gap-2 text-sm font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Banking
                 </Link>
               </>
             )}

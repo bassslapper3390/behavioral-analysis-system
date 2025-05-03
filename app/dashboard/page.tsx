@@ -3,11 +3,23 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Activity, MousePointer, Keyboard, CreditCard } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { AlertCircle, Activity, MousePointer, Keyboard } from "lucide-react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { isUserLockedOut, getRemainingLockoutTime } from "@/lib/banking-security"
+import { behaviorMonitor } from '@/lib/monitoring'
+
+const stats = [
+  { name: 'Total Patients', value: '1,284' },
+  { name: 'Today\'s Appointments', value: '42' },
+  { name: 'Available Staff', value: '18' },
+  { name: 'Pending Reports', value: '7' },
+]
+
+const recentActivities = [
+  { id: 1, type: 'appointment', description: 'New appointment scheduled for John Doe', time: '2 minutes ago' },
+  { id: 2, type: 'admission', description: 'Patient admitted to Ward 3', time: '15 minutes ago' },
+  { id: 3, type: 'discharge', description: 'Patient discharged from Ward 1', time: '1 hour ago' },
+  { id: 4, type: 'report', description: 'Lab results uploaded for Jane Smith', time: '2 hours ago' },
+]
 
 export default function Dashboard() {
   const router = useRouter()
@@ -15,14 +27,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [showBankingAlert, setShowBankingAlert] = useState(false)
-  const [lockoutMinutes, setLockoutMinutes] = useState(0)
   const [behavioralStats, setBehavioralStats] = useState({
     typingSpeed: 0,
     mouseMovements: 0,
     clickCount: 0,
     anomalyRate: 0,
-  })
+  }) 
 
   useEffect(() => {
     // Check if user is logged in
@@ -35,12 +45,6 @@ export default function Dashboard() {
     }
 
     setIsAuthenticated(true)
-
-    // Check if banking is locked out
-    if (isUserLockedOut()) {
-      setShowBankingAlert(true)
-      setLockoutMinutes(getRemainingLockoutTime())
-    }
 
     // Fetch anomalies from the backend
     const fetchAnomalies = async () => {
@@ -78,6 +82,12 @@ export default function Dashboard() {
     }
 
     fetchAnomalies()
+
+    // Initialize behavior monitoring
+    const userId = localStorage.getItem('userId')
+    if (userId) {
+      behaviorMonitor.setUserId(userId)
+    }
   }, [router])
 
   if (!isAuthenticated) {
@@ -87,34 +97,6 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Behavioral Analysis Dashboard</h1>
-
-      {showBankingAlert && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Banking access is temporarily locked due to suspicious activity. Please try again in {lockoutMinutes}{" "}
-            minutes.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Banking Access Card */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <CreditCard className="h-10 w-10 text-primary mr-4" />
-              <div>
-                <h2 className="text-2xl font-bold">Banking Portal</h2>
-                <p className="text-muted-foreground">Access your secure banking dashboard</p>
-              </div>
-            </div>
-            <Button asChild disabled={showBankingAlert} size="lg" className="mt-2">
-              <Link href="/banking">{showBankingAlert ? "Access Locked" : "Access Banking Portal →"}</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {loading ? (
         <div className="flex justify-center p-8">
@@ -257,6 +239,56 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
+
+      <h2 className="text-2xl font-bold mb-6 mt-8">Dashboard Overview</h2>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {stats.map((stat) => (
+          <div key={stat.name} className="bg-white p-6 rounded-lg shadow">
+            <dt className="text-sm font-medium text-gray-500 truncate">{stat.name}</dt>
+            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stat.value}</dd>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-medium mb-4">Recent Activity</h3>
+        <div className="flow-root">
+          <ul className="-mb-8">
+            {recentActivities.map((activity, activityIdx) => (
+              <li key={activity.id}>
+                <div className="relative pb-8">
+                  {activityIdx !== recentActivities.length - 1 ? (
+                    <span
+                      className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <div className="relative flex space-x-3">
+                    <div>
+                      <span className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ring-8 ring-white">
+                        <span className="text-white text-sm">
+                          {activity.type[0].toUpperCase()}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                      <div>
+                        <p className="text-sm text-gray-500">{activity.description}</p>
+                      </div>
+                      <div className="text-right text-sm whitespace-nowrap text-gray-500">
+                        <time>{activity.time}</time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   )
 }

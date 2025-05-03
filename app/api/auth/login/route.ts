@@ -1,39 +1,46 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db"
-import { createToken, logAudit } from "@/lib/auth"
+import { query, saveLoginHistory } from "@/lib/db"
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json()
+    const { username, password, behavioralProfile } = await request.json()
 
-    // Find user in database
-    const users = (await query("SELECT * FROM users WHERE username = ?", [username])) as any[]
-
-    // Check if user exists and password matches
-    // In a real app, you would use bcrypt to compare hashed passwords
-    if (users.length === 0 || users[0].password !== password) {
-      return NextResponse.json({ message: "Invalid username or password" }, { status: 401 })
-    }
+    // Get user from database
+    const users = await query(
+      "SELECT * FROM users WHERE username = ?",
+      [username]
+    ) as any[]
 
     const user = users[0]
 
-    // Generate JWT token
-    const token = createToken({ id: user.id, username: user.username })
+    if (!user || user.password !== password) { // In production, use proper password hashing
+      return NextResponse.json(
+        { error: "Invalid username or password" },
+        { status: 401 }
+      )
+    }
 
-    // Log the login action
-    await logAudit(user.id, "LOGIN", "users", user.id.toString(), "User login successful")
+    // Save behavioral profile if provided
+    if (behavioralProfile) {
+      console.log("Saving behavioral profile for user:", user.id)
+      await saveLoginHistory(user.id, behavioralProfile)
+    }
+
+    // Log successful login
+    await query(
+      "INSERT INTO audit_logs (user_id, timestamp, action, table_name, record_id, details) VALUES (?, NOW(), ?, ?, ?, ?)",
+      [user.id, "LOGIN", "users", user.id, "User logged in successfully"]
+    )
 
     return NextResponse.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-      },
+      userId: user.id,
+      username: user.username,
     })
   } catch (error) {
-    console.error("Login error:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    console.error("Login API Error:", error)
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    )
   }
 }

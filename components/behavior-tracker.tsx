@@ -1,5 +1,7 @@
 "use client"
+
 import type React from "react"
+
 import { useEffect, useRef, useState } from "react"
 import {
   trackMouseMovements,
@@ -14,23 +16,15 @@ import {
 
 interface BehaviorTrackerProps {
   onProfileGenerated?: (profile: BehavioralProfile) => void
-  onTrackingStart?: () => void
-  onTrackingEnd?: () => void
   duration?: number
   autoStart?: boolean
-  continuousMonitoring?: boolean
-  monitoringInterval?: number
   children: React.ReactNode
 }
 
 export default function BehaviorTracker({
   onProfileGenerated,
-  onTrackingStart,
-  onTrackingEnd,
   duration = 10000,
   autoStart = true,
-  continuousMonitoring = false,
-  monitoringInterval = 60000, // 1 minute by default
   children,
 }: BehaviorTrackerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -39,13 +33,11 @@ export default function BehaviorTracker({
   const [keyPresses, setKeyPresses] = useState<KeyPress[]>([])
   const [clickEvents, setClickEvents] = useState<ClickEvent[]>([])
   const [profileGenerated, setProfileGenerated] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const startTracking = async () => {
     if (!containerRef.current || isTracking) return
 
     setIsTracking(true)
-    if (onTrackingStart) onTrackingStart()
     console.log("Starting behavior tracking for", duration, "ms")
 
     try {
@@ -62,17 +54,12 @@ export default function BehaviorTracker({
         clickEvents: clicks.length,
       })
 
-      setMouseMovements((prev) => [...prev, ...movements])
-      setKeyPresses((prev) => [...prev, ...presses])
-      setClickEvents((prev) => [...prev, ...clicks])
+      setMouseMovements(movements)
+      setKeyPresses(presses)
+      setClickEvents(clicks)
 
       // Generate profile
-      const profile = generateBehavioralProfile(
-        [...keyPresses, ...presses],
-        [...mouseMovements, ...movements],
-        [...clickEvents, ...clicks],
-      )
-
+      const profile = generateBehavioralProfile(presses, movements, clicks)
       console.log("Generated behavioral profile:", {
         typingSpeed: profile.typingSpeed,
         typingRhythmCount: profile.typingRhythm.length,
@@ -86,18 +73,10 @@ export default function BehaviorTracker({
       if (onProfileGenerated) {
         onProfileGenerated(profile)
       }
-
-      // Reset data arrays if not doing continuous monitoring
-      if (!continuousMonitoring) {
-        setMouseMovements([])
-        setKeyPresses([])
-        setClickEvents([])
-      }
     } catch (error) {
       console.error("Error tracking behavior:", error)
     } finally {
       setIsTracking(false)
-      if (onTrackingEnd) onTrackingEnd()
     }
   }
 
@@ -105,23 +84,7 @@ export default function BehaviorTracker({
     if (autoStart && !profileGenerated) {
       startTracking()
     }
-
-    // Set up continuous monitoring if enabled
-    if (continuousMonitoring && !intervalRef.current) {
-      intervalRef.current = setInterval(() => {
-        if (!isTracking) {
-          startTracking()
-        }
-      }, monitoringInterval)
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-  }, [autoStart, profileGenerated, continuousMonitoring, isTracking])
+  }, [autoStart, profileGenerated])
 
   return (
     <div
@@ -130,6 +93,12 @@ export default function BehaviorTracker({
       tabIndex={0} // Make div focusable for key events
     >
       {children}
+
+      {isTracking && (
+        <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs animate-pulse">
+          Analyzing behavior...
+        </div>
+      )}
     </div>
   )
 }
